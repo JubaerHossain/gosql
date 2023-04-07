@@ -8,7 +8,17 @@
 GoSQL is a package that provides a simple way to query and manipulate SQL databases from GraphQL resolvers in Go.
 
 Features - Query models by ID or with a where clause. - Specify which fields to select from the database using GraphQL queries. - Automatically convert database rows into Go struct instances. - Easily build a where clause with a map of column names and values. - Supports PostgreSQL, MySQL, and SQLite databases.
-Usage
+
+# Installation
+
+To use this package in your Go project, you can install it using the go get command:
+
+```golang
+go get github.com/JubaerHossain/gosql
+```
+
+# Getting Started
+
 To use GoSQL, first, you need to import the package:
 
 ```go
