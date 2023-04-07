@@ -17,13 +17,16 @@ import "github.com/your-username/gosql"
 
 Then, define your model struct and make sure that the field names match the column names in your database table:
 
-````go
+```go
+
 type User struct {
     ID        int
     FirstName string
     LastName  string
     Email     string
 }
+
+
 ```
 You can then use GoSQL to query the database and get the results as a slice of struct instances:
 
