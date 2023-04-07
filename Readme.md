@@ -12,7 +12,7 @@ Usage
 To use GoSQL, first, you need to import the package:
 
 ```go
-import "github.com/your-username/gosql"
+import "github.com/JubaerHossain/gosql"
 ```
 
 Then, define your model struct and make sure that the field names match the column names in your database table:
