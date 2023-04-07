@@ -213,7 +213,7 @@ func CreateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	}
 
 	// Return the newly created model data
-	return model, nil
+	return FindByID(modelType, modelName, params, db)
 }
 
 func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
@@ -264,7 +264,6 @@ func UpdateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	// Return the updated model
 	return FindByID(modelType, modelName, params, db)
 }
-
 
 func DeleteModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
