@@ -217,7 +217,6 @@ func CreateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 }
 
 func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
-
 	// Get the model data from the GraphQL params
 	model := params.Args["model"]
 
@@ -233,9 +232,14 @@ func UpdateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 
 	// Loop through the model fields and add them to the fields and values slices
 	for key, value := range modelMap {
-		fields = append(fields, fmt.Sprintf("%s = ?", key))
-		values = append(values, value)
+		if key != "id" {
+			fields = append(fields, fmt.Sprintf("%s = ?", key))
+			values = append(values, value)
+		}
 	}
+
+	// Add the ID to the values slice
+	values = append(values, params.Args["id"])
 
 	// Build the SQL query string
 	fieldString := strings.Join(fields, ",")
@@ -247,17 +251,20 @@ func UpdateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 		return nil, errors.New(err.Error())
 	}
 
-	// Get the ID of the updated model
-	id, err := result.LastInsertId()
+	// Get the number of rows affected by the update
+	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return nil, errors.New(err.Error())
 	}
 
-	params.Args["id"] = id
+	if rowsAffected == 0 {
+		return nil, errors.New("no rows updated")
+	}
 
 	// Return the updated model
 	return FindByID(modelType, modelName, params, db)
 }
+
 
 func DeleteModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
