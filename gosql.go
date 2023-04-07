@@ -1,6 +1,7 @@
 package gosql
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
@@ -60,10 +61,7 @@ func BuildWhereClause(where map[string]interface{}) (string, []interface{}) {
 	return strings.Join(whereClauses, " AND "), whereArgs
 }
 
-func QueryModel(modelType reflect.Type, modelName string, params graphql.ResolveParams) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
-
+func QueryModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 	where, ok := params.Args["where"].(map[string]interface{})
 	if !ok {
 		where = make(map[string]interface{})
@@ -122,9 +120,7 @@ func QueryModel(modelType reflect.Type, modelName string, params graphql.Resolve
 	return results.Interface(), nil
 }
 
-func FindByID(modelType reflect.Type, modelName string, params graphql.ResolveParams) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
+func FindByID(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
 	// Get the query parameters
 	id, ok := params.Args["id"].(int)
@@ -152,9 +148,7 @@ func FindByID(modelType reflect.Type, modelName string, params graphql.ResolvePa
 	return reflect.ValueOf(model).Elem().Interface(), nil
 }
 
-func QueryModelCount(modelName string, params graphql.ResolveParams) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
+func QueryModelCount(modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
 	// Build the SQL query string
 	sql := fmt.Sprintf("SELECT COUNT(*) FROM %s;", modelName)
@@ -175,9 +169,7 @@ func QueryModelCount(modelName string, params graphql.ResolveParams) (interface{
 	return count, nil
 }
 
-func CreateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
+func CreateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
 	// Get the model data from the GraphQL params
 	model := params.Args["model"]
@@ -224,9 +216,7 @@ func CreateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	return model, nil
 }
 
-func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
+func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
 	// Get the model data from the GraphQL params
 	model := params.Args["model"]
@@ -266,12 +256,10 @@ func UpdateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	params.Args["id"] = id
 
 	// Return the updated model
-	return FindByID(modelType, modelName, params)
+	return FindByID(modelType, modelName, params, db)
 }
 
-func DeleteModel(modelType reflect.Type, modelName string, params graphql.ResolveParams) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
+func DeleteModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
 
 	// Get the model ID from the GraphQL params
 	id, ok := params.Args["id"].(int)
@@ -298,9 +286,7 @@ func DeleteModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	return rows, nil
 }
 
-func WhereModel(modelType reflect.Type, tableName string, params graphql.ResolveParams, where map[string]interface{}) (interface{}, error) {
-	// Get the database connection
-	db := database.DB
+func WhereModel(modelType reflect.Type, tableName string, params graphql.ResolveParams, where map[string]interface{}, db *sql.DB) (interface{}, error) {
 
 	// Build the SQL query string
 	selectColumn := GetColumns(params)
