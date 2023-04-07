@@ -23,7 +23,8 @@ type User struct {
     FirstName string
     LastName  string
     Email     string
-}```
+}
+```
 You can then use GoSQL to query the database and get the results as a slice of struct instances:
 
 ```go
@@ -36,7 +37,8 @@ func GetUser(params graphql.ResolveParams) (interface{}, error) {
 
     // Return the results
     return users, nil
-}```
+}
+```
 You can also query a single record by ID:
 
 ```go
@@ -49,7 +51,8 @@ func GetUserByID(params graphql.ResolveParams) (interface{}, error) {
 
     // Return the result
     return user, nil
-}```
+}
+```
 Where Clauses
 You can also build a where clause using a map of column names and values:
 
@@ -67,7 +70,8 @@ func GetUsersWithLastName(params graphql.ResolveParams) (interface{}, error) {
 
     // Return the results
     return users, nil
-}```
+}
+```
 Selecting Fields
 You can specify which fields to select from the database using GraphQL queries:
 
@@ -78,7 +82,8 @@ You can specify which fields to select from the database using GraphQL queries:
         firstName
         email
     }
-}```
+}
+```
 
 
 ```go
@@ -94,7 +99,8 @@ func GetUser(params graphql.ResolveParams) (interface{}, error) {
 
     // Return the results
     return users, nil
-}```
+}
+```
 Supported Databases
 GoSQL supports PostgreSQL, MySQL, and SQLite databases. To connect to your database, you need to set the DB variable in the database package to a database handle.
 
@@ -110,8 +116,8 @@ func init() {
     }
 
     database.DB = db
-}```
+}
+```
 Contributing
 Contributions are welcome! If you find a bug or want to add a feature, please open an issue or submit a pull request.
 
-````
