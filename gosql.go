@@ -15,7 +15,9 @@ func StructToMap(obj interface{}) map[string]interface{} {
 	v := reflect.ValueOf(obj)
 	values := make(map[string]interface{})
 	for i := 0; i < v.NumField(); i++ {
-		values[v.Type().Field(i).Name] = v.Field(i).Interface()
+		if v.Field(i).Interface() != nil && v.Field(i).Interface() != "" {
+			values[v.Type().Field(i).Name] = v.Field(i).Interface()
+		}
 	}
 	return values
 }
@@ -249,23 +251,16 @@ func CreateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	return response, nil
 }
 
-func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
-	// Get the model data from the GraphQL params
-	model := params.Args["model"]
+func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, Input interface{}, db *sql.DB) (interface{}, error) {
 
-	// Convert the model data to a map
-	modelMap, ok := model.(map[string]interface{})
-	if !ok {
-		return nil, errors.New("invalid model")
-	}
-
+	modelMap := StructToMap(Input)
 	// Create a slice to hold the field names and a slice to hold the field values
 	var fields []string
 	var values []interface{}
 
 	// Loop through the model fields and add them to the fields and values slices
 	for key, value := range modelMap {
-		if key != "id" {
+		if key != "id" && key != "Id" {
 			fields = append(fields, fmt.Sprintf("%s = ?", key))
 			values = append(values, value)
 		}
@@ -277,25 +272,17 @@ func UpdateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	// Build the SQL query string
 	fieldString := strings.Join(fields, ",")
 	sql := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?;", modelName, fieldString)
-
 	// Execute the query
-	result, err := db.Exec(sql, values...)
+	_, err := db.Exec(sql, values...)
 	if err != nil {
 		return nil, errors.New(err.Error())
 	}
-
-	// Get the number of rows affected by the update
-	rowsAffected, err := result.RowsAffected()
+	modelMap["id"] = params.Args["id"]
+	user, err := FindByID(modelType, modelName, params, db)
 	if err != nil {
-		return nil, errors.New(err.Error())
+		return nil, errors.New("failed to retrieve updated model")
 	}
-
-	if rowsAffected == 0 {
-		return nil, errors.New("no rows updated")
-	}
-
-	// Return the updated model
-	return FindByID(modelType, modelName, params, db)
+	return user, nil
 }
 
 func DeleteModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
