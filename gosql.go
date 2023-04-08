@@ -11,6 +11,34 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 )
 
+func StructToMap(obj interface{}) map[string]interface{} {
+	v := reflect.ValueOf(obj)
+	values := make(map[string]interface{})
+	for i := 0; i < v.NumField(); i++ {
+		values[v.Type().Field(i).Name] = v.Field(i).Interface()
+	}
+	return values
+}
+
+func MapToStruct(data map[string]interface{}, resultType reflect.Type) interface{} {
+	result := reflect.New(resultType).Elem()
+	for key, value := range data {
+		field := result.FieldByName(key)
+		if !field.IsValid() {
+			continue
+		}
+		if !field.CanSet() {
+			continue
+		}
+		fieldValue := reflect.ValueOf(value)
+		if field.Type() != fieldValue.Type() {
+			continue
+		}
+		field.Set(fieldValue)
+	}
+	return result.Interface()
+}
+
 func GetColumns(params graphql.ResolveParams) string {
 	fieldASTs := params.Info.FieldASTs
 	var fields = make(map[string]interface{})
@@ -121,9 +149,12 @@ func QueryModel(modelType reflect.Type, modelName string, params graphql.Resolve
 }
 
 func FindByID(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
+	fmt.Println("from find id")
+
+	fmt.Println(GetColumns(params))
 
 	// Get the query parameters
-	id, ok := params.Args["id"].(int)
+	id, ok := params.Args["id"]
 	if !ok {
 		return nil, errors.New("id is required")
 	}
@@ -134,6 +165,8 @@ func FindByID(modelType reflect.Type, modelName string, params graphql.ResolvePa
 	row := db.QueryRow(sql)
 	// Create a new model instance
 	model := reflect.New(modelType).Interface()
+
+	fmt.Println(model)
 
 	// Get a list of pointers to the fields in the model struct
 	columns, err := ModelColumn(selectColumn, model)
@@ -169,17 +202,9 @@ func QueryModelCount(modelName string, params graphql.ResolveParams, db *sql.DB)
 	return count, nil
 }
 
-func CreateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
+func CreateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, Input interface{}, db *sql.DB) (interface{}, error) {
 
-	// Get the model data from the GraphQL params
-	model := params.Args["model"]
-
-	// Convert the model data to a map
-	modelMap, ok := model.(map[string]interface{})
-	if !ok {
-		return nil, errors.New("invalid model")
-	}
-
+	modelMap := StructToMap(Input)
 	// Create a slice to hold the field names and a slice to hold the field values
 	var fields []string
 	var values []interface{}
@@ -212,8 +237,16 @@ func CreateModel(modelType reflect.Type, modelName string, params graphql.Resolv
 		return nil, errors.New("failed to create model")
 	}
 
-	// Return the newly created model data
-	return FindByID(modelType, modelName, params, db)
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, errors.New(err.Error())
+	}
+
+	modelMap["id"] = id
+
+	response := MapToStruct(modelMap, modelType)
+
+	return response, nil
 }
 
 func UpdateModel(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
