@@ -292,24 +292,23 @@ func DeleteModel(modelType reflect.Type, modelName string, params graphql.Resolv
 	if !ok {
 		return nil, errors.New("id is required")
 	}
+	
 
 	// Build the SQL query string
 	sql := fmt.Sprintf("DELETE FROM %s WHERE id = ?;", modelName)
 
 	// Execute the query
-	result, err := db.Exec(sql, id)
+	_, err := db.Exec(sql, id)
 	if err != nil {
 		return nil, errors.New(err.Error())
 	}
-
-	// Get the number of rows affected
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, errors.New(err.Error())
+	
+	response := map[string]string{
+		"status": "true",
+		"message": "Data deleted successfully",
 	}
+	return response, nil
 
-	// Return the number of rows affected
-	return rows, nil
 }
 
 func WhereModel(modelType reflect.Type, tableName string, params graphql.ResolveParams, where map[string]interface{}, db *sql.DB) (interface{}, error) {
