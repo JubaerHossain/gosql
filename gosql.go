@@ -1,6 +1,7 @@
 package gosql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -79,6 +80,36 @@ func ModelColumn(selectColumn string, v interface{}) ([]interface{}, error) {
 	}
 	return columns, nil
 }
+func ModelColumns(model interface{}) ([]interface{}, error) {
+	// Get the model type
+	modelType := reflect.TypeOf(model)
+
+	// Make sure the model is a struct
+	if modelType.Kind() != reflect.Struct {
+		return nil, errors.New("model is not a struct")
+	}
+
+	// Create a slice to hold the field pointers
+	columns := make([]interface{}, 0)
+
+	// Loop through the fields of the struct and get a pointer to each one
+	for i := 0; i < modelType.NumField(); i++ {
+		field := modelType.Field(i)
+
+		// Skip unexported fields
+		if field.PkgPath != "" {
+			continue
+		}
+
+		// Get a pointer to the field
+		column := reflect.ValueOf(model).Elem().FieldByName(field.Name).Addr().Interface()
+
+		// Append the field pointer to the slice
+		columns = append(columns, column)
+	}
+
+	return columns, nil
+}
 
 func BuildWhereClause(where map[string]interface{}) (string, []interface{}) {
 	var whereClauses []string
@@ -114,6 +145,8 @@ func QueryModel(modelType reflect.Type, modelName string, params graphql.Resolve
 	if whereClause == "" {
 		whereClause = "1 = 1"
 	}
+
+	fmt.Println("selectColumn", selectColumn)
 	sql := fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY id DESC LIMIT %d OFFSET %d;", selectColumn, modelName, whereClause, pageSize, offset)
 	// Execute the query
 	rows, err := db.Query(sql, whereArgs...)
@@ -151,9 +184,6 @@ func QueryModel(modelType reflect.Type, modelName string, params graphql.Resolve
 }
 
 func FindByID(modelType reflect.Type, modelName string, params graphql.ResolveParams, db *sql.DB) (interface{}, error) {
-	fmt.Println("from find id")
-
-	fmt.Println(GetColumns(params))
 
 	// Get the query parameters
 	id, ok := params.Args["id"]
@@ -167,8 +197,6 @@ func FindByID(modelType reflect.Type, modelName string, params graphql.ResolvePa
 	row := db.QueryRow(sql)
 	// Create a new model instance
 	model := reflect.New(modelType).Interface()
-
-	fmt.Println(model)
 
 	// Get a list of pointers to the fields in the model struct
 	columns, err := ModelColumn(selectColumn, model)
@@ -307,14 +335,21 @@ func DeleteModel(modelType reflect.Type, modelName string, params graphql.Resolv
 }
 
 func WhereModel(modelType reflect.Type, tableName string, params graphql.ResolveParams, where map[string]interface{}, db *sql.DB) (interface{}, error) {
-
 	// Build the SQL query string
 	selectColumn := GetColumns(params)
 	whereClause, whereArgs := BuildWhereClause(where)
 	sql := fmt.Sprintf("SELECT %s FROM %s WHERE %s;", selectColumn, tableName, whereClause)
 
-	// Execute the query
-	rows, err := db.Query(sql, whereArgs...)
+	// Prepare the statement
+	stmt, err := db.Prepare(sql)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	// Execute the query with context
+	ctx := context.Background()
+	rows, err := stmt.QueryContext(ctx, whereArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -337,6 +372,87 @@ func WhereModel(modelType reflect.Type, tableName string, params graphql.Resolve
 		// Scan the current row of data into the model struct fields
 		err = rows.Scan(columns...)
 		if err != nil {
+			return nil, errors.New("no data found")
+		}
+
+		// Append the model instance to the models slice
+		models = reflect.Append(models, reflect.ValueOf(model).Elem())
+	}
+
+	// Convert the models slice to an interface{} and return it
+	return models.Interface(), nil
+}
+
+func RawInsertModel(tableName string, data map[string]interface{}, db *sql.DB) (int64, error) {
+	// Create a slice to hold the field names and a slice to hold the field values
+	var fields []string
+	var values []interface{}
+
+	// Loop through the data map and add the keys to the fields slice and the values to the values slice
+	for key, value := range data {
+		fields = append(fields, key)
+		values = append(values, value)
+	}
+
+	// Build the SQL query string
+	fieldString := strings.Join(fields, ",")
+	valueString := strings.Repeat("?,", len(fields))
+	valueString = valueString[:len(valueString)-1]
+	sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);", tableName, fieldString, valueString)
+
+	// Execute the query
+	result, err := db.Exec(sql, values...)
+	if err != nil {
+		return 0, errors.New(err.Error())
+	}
+
+	// Get the number of rows affected by the query
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.New(err.Error())
+	}
+
+	if rowsAffected == 0 {
+		return 0, errors.New("failed to insert model")
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, errors.New(err.Error())
+	}
+
+	return id, nil
+}
+
+func FindAllModel(modelType reflect.Type, tableName string, where map[string]interface{}, selectColumn []string, db *sql.DB) (interface{}, error) {
+	// Build the SQL query string
+	whereClause, whereArgs := BuildWhereClause(where)
+	sql := fmt.Sprintf("SELECT %s FROM %s WHERE %s", strings.Join(selectColumn, ","), tableName, whereClause)
+
+	// Execute the query
+	rows, err := db.Query(sql, whereArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Create a new slice to hold the model instances
+	models := reflect.MakeSlice(reflect.SliceOf(modelType), 0, 0)
+
+	// Loop through the query results and create a new model instance for each row
+	for rows.Next() {
+		// Create a new model instance
+		model := reflect.New(modelType).Interface()
+		// Get a list of pointers to the fields in the model struct
+		columns, err := ModelColumn(strings.Join(selectColumn, ","), model)
+		if err != nil {
+			return nil, err
+		}
+
+		// Scan the current row of data into the model struct fields
+		err = rows.Scan(columns...)
+		if err != nil {
+			fmt.Println(err)
 			return nil, errors.New("no data found")
 		}
 
